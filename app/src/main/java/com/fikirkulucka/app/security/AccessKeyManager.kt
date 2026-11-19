@@ -19,14 +19,19 @@ data class AccessUiState(
 class AccessKeyManager(context: Context) {
 
     companion object {
-        // Bu Key numarasını göndereceğin kişiye verebilirsin
-        const val VALID_ACCESS_KEY: String = "KULUCKA-5DK-8492"
+        // 1. Key: Senin test etmen için
+        // 2. Key: Arkadaşına göndermen için
+        val VALID_ACCESS_KEYS: Set<String> = setOf(
+            "KULUCKA-TEST-1104",
+            "KULUCKA-ARKADAS-7391"
+        )
         const val TRIAL_DURATION_MILLIS: Long = 5L * 60L * 1000L // 5 dakika
 
         private const val PREFS_NAME = "fikir_kulucka_access_guard"
         private const val KEY_PERMANENTLY_EXPIRED = "permanently_expired"
         private const val KEY_EXPIRES_AT = "expires_at_millis"
         private const val KEY_MAX_SEEN_TIME = "max_seen_millis"
+        private const val KEY_USED_KEYS = "used_keys"
     }
 
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -50,7 +55,6 @@ class AccessKeyManager(context: Context) {
 
         val expiresAt = prefs.getLong(KEY_EXPIRES_AT, 0L)
         if (expiresAt > 0L) {
-            // Saat geriye alınsa bile maxSeen üzerinden süre tüketimini koru
             val effectiveNow = maxOf(now, maxSeen)
             val remaining = expiresAt - effectiveNow
             return if (remaining > 0L) {
@@ -84,10 +88,22 @@ class AccessKeyManager(context: Context) {
         }
 
         val normalized = rawInput.trim().uppercase()
-        if (normalized == VALID_ACCESS_KEY) {
+        val usedKeys = prefs.getStringSet(KEY_USED_KEYS, emptySet()) ?: emptySet()
+
+        if (normalized in usedKeys) {
+            _state.value = current.copy(
+                status = AccessStatus.LOCKED_NEEDS_KEY,
+                errorMessage = "Bu Key daha önce kullanıldı."
+            )
+            return
+        }
+
+        if (normalized in VALID_ACCESS_KEYS) {
             val now = System.currentTimeMillis()
             val expiresAt = now + TRIAL_DURATION_MILLIS
+            val updatedUsed = usedKeys + normalized
             prefs.edit()
+                .putStringSet(KEY_USED_KEYS, updatedUsed)
                 .putLong(KEY_EXPIRES_AT, expiresAt)
                 .putLong(KEY_MAX_SEEN_TIME, maxOf(prefs.getLong(KEY_MAX_SEEN_TIME, 0L), now))
                 .putBoolean(KEY_PERMANENTLY_EXPIRED, false)
