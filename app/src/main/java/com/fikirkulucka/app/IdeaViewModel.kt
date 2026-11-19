@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fikirkulucka.app.data.AppDatabase
+import com.fikirkulucka.app.data.ExecutionState
 import com.fikirkulucka.app.data.IdeaCatalogEngine
 import com.fikirkulucka.app.data.IdeaEntity
 import com.fikirkulucka.app.data.IdeaStatus
@@ -64,26 +65,57 @@ class IdeaViewModel(application: Application) : AndroidViewModel(application) {
                     content = trimmed,
                     createdAt = now,
                     matureAt = matureAt,
-                    status = IdeaStatus.INCUBATING
+                    status = IdeaStatus.INCUBATING,
+                    executionState = ExecutionState.PENDING
                 )
             )
         }
     }
 
     fun incubateSuggestion(suggestion: SuggestedIdea, incubationDays: Int = 3) {
-        val formatted = "[${suggestion.category}] ${suggestion.title}"
-        addIdea(formatted, incubationDays)
+        val now = System.currentTimeMillis()
+        val matureAt = now + TimeUnit.DAYS.toMillis(incubationDays.toLong())
+        viewModelScope.launch {
+            dao.insert(
+                IdeaEntity(
+                    content = "[${suggestion.category}] ${suggestion.title}",
+                    createdAt = now,
+                    matureAt = matureAt,
+                    status = IdeaStatus.INCUBATING,
+                    executionState = ExecutionState.PENDING,
+                    category = suggestion.category,
+                    detailText = suggestion.description,
+                    stepsSerialized = suggestion.howToDoIt.joinToString("||")
+                )
+            )
+        }
     }
 
-    fun approveIdea(idea: IdeaEntity) {
+    fun approveIdeaWithState(idea: IdeaEntity, state: ExecutionState) {
         viewModelScope.launch {
-            dao.update(idea.copy(status = IdeaStatus.APPROVED))
+            dao.update(
+                idea.copy(
+                    status = IdeaStatus.APPROVED,
+                    executionState = state
+                )
+            )
+        }
+    }
+
+    fun updateExecutionState(idea: IdeaEntity, state: ExecutionState) {
+        viewModelScope.launch {
+            dao.update(idea.copy(executionState = state))
         }
     }
 
     fun archiveIdea(idea: IdeaEntity) {
         viewModelScope.launch {
-            dao.update(idea.copy(status = IdeaStatus.ARCHIVED))
+            dao.update(
+                idea.copy(
+                    status = IdeaStatus.ARCHIVED,
+                    executionState = ExecutionState.CANCELLED
+                )
+            )
         }
     }
 
