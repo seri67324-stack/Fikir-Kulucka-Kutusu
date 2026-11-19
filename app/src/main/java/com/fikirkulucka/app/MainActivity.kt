@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -21,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -32,17 +33,22 @@ import com.fikirkulucka.app.data.ExecutionState
 import com.fikirkulucka.app.data.IdeaCatalogEngine
 import com.fikirkulucka.app.data.IdeaEntity
 import com.fikirkulucka.app.data.SuggestedIdea
+import com.fikirkulucka.app.security.AccessKeyManager
+import com.fikirkulucka.app.security.AccessStatus
+import com.fikirkulucka.app.security.AccessUiState
 import com.fikirkulucka.app.ui.components.IncubationCard
 import com.fikirkulucka.app.ui.components.IncubationDashboardCanvas
 import com.fikirkulucka.app.ui.components.SwipeReviewCard
 import com.fikirkulucka.app.ui.theme.*
+import kotlinx.coroutines.delay
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FikirKuluckaTheme {
-                FikirKuluckaApp()
+                AccessGuardedRoot()
             }
         }
     }
@@ -50,9 +56,169 @@ class MainActivity : ComponentActivity() {
 
 private val durationOptions = listOf("10DK", "1SA", "1G", "3G", "7G", "14G")
 
+private fun formatCountdown(millis: Long): String {
+    val totalSec = (millis / 1000L).coerceAtLeast(0L)
+    val mins = totalSec / 60L
+    val secs = totalSec % 60L
+    return String.format(Locale.US, "%02d:%02d", mins, secs)
+}
+
+@Composable
+fun AccessGuardedRoot() {
+    val context = LocalContext.current
+    val keyManager = remember { AccessKeyManager(context) }
+    val accessState by keyManager.state.collectAsState()
+    var keyInput by remember { mutableStateOf("") }
+
+    LaunchedEffect(accessState.status) {
+        if (accessState.status == AccessStatus.ACTIVE_TRIAL) {
+            while (true) {
+                delay(1000L)
+                keyManager.tick()
+            }
+        }
+    }
+
+    when (accessState.status) {
+        AccessStatus.LOCKED_NEEDS_KEY -> {
+            KeyEntryScreen(
+                keyInput = keyInput,
+                errorMessage = accessState.errorMessage,
+                onKeyChange = { keyInput = it },
+                onUnlock = { keyManager.submitKey(keyInput) }
+            )
+        }
+        AccessStatus.EXPIRED_PERMANENTLY -> {
+            PermanentlyExpiredScreen()
+        }
+        AccessStatus.ACTIVE_TRIAL -> {
+            FikirKuluckaApp(accessState = accessState)
+        }
+    }
+}
+
+@Composable
+private fun KeyEntryScreen(
+    keyInput: String,
+    errorMessage: String?,
+    onKeyChange: (String) -> Unit,
+    onUnlock: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(PearlBackground, SoftTintCard, PearlBackground)))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(26.dp))
+                .background(PureCard)
+                .border(1.dp, BorderSoft, RoundedCornerShape(26.dp))
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(SoftTintCard),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.Lock, contentDescription = null, tint = VibrantCobalt, modifier = Modifier.size(30.dp))
+            }
+            Text(
+                "5 Dakikalık Erişim Anahtarı",
+                color = InkDark,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp
+            )
+            Text(
+                "Uygulamayı açmak için sana verilen Key numarasını gir. Key girildikten sonra erişim 5 dakika sürer ve süre bitince uygulama kalıcı olarak kapanır.",
+                color = SlateMuted,
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+                textAlign = TextAlign.Center
+            )
+            OutlinedTextField(
+                value = keyInput,
+                onValueChange = onKeyChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Key Numarası") },
+                placeholder = { Text("Örn: KULUCKA-5DK-8492") },
+                isError = errorMessage != null
+            )
+            if (errorMessage != null) {
+                Text(errorMessage, color = CoralRose, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+            Button(
+                onClick = onUnlock,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = VibrantCobalt, contentColor = Color.White)
+            ) {
+                Icon(Icons.Rounded.Key, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Key Doğrula & 5 Dakika Başlat", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermanentlyExpiredScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(PearlBackground, Color(0xFFFFF1F2), PearlBackground)))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(26.dp))
+                .background(PureCard)
+                .border(1.5.dp, CoralRose.copy(alpha = 0.4f), RoundedCornerShape(26.dp))
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(58.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFFFE4E6)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.LockClock, contentDescription = null, tint = CoralRose, modifier = Modifier.size(32.dp))
+            }
+            Text(
+                "5 Dakikalık Süre Doldu",
+                color = InkDark,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp
+            )
+            Text(
+                "Bu uygulama için tanımlanan 5 dakikalık erişim süresi tamamlandı. Erişim kalıcı olarak sonlandırıldı ve uygulama artık yeniden açılmayacak.",
+                color = SlateMuted,
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FikirKuluckaApp(vm: IdeaViewModel = viewModel()) {
+fun FikirKuluckaApp(
+    accessState: AccessUiState,
+    vm: IdeaViewModel = viewModel()
+) {
     val suggestions by vm.filteredSuggestions.collectAsState()
     val selectedCategory by vm.selectedCategory.collectAsState()
     val searchQuery by vm.searchQuery.collectAsState()
@@ -116,6 +282,21 @@ fun FikirKuluckaApp(vm: IdeaViewModel = viewModel()) {
                                 fontWeight = FontWeight.Medium
                             )
                         }
+                    }
+                },
+                actions = {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFEF3C7),
+                        modifier = Modifier.padding(end = 12.dp)
+                    ) {
+                        Text(
+                            text = "⏱ ${formatCountdown(accessState.remainingMillis)}",
+                            color = SunnyAmber,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PearlBackground)
@@ -782,7 +963,7 @@ private fun IncubatingListTab(
                     Text(
                         "Henüz kuluçkada fikir yok.\nÖneriler sekmesinden seç veya Fikir Ekle ile yeni fikir bırak.",
                         color = SlateMuted,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        textAlign = TextAlign.Center
                     )
                 }
             }
