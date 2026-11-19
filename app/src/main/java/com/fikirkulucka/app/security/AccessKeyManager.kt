@@ -19,11 +19,17 @@ data class AccessUiState(
 class AccessKeyManager(context: Context) {
 
     companion object {
-        // 1. Key: Senin test etmen için
-        // 2. Key: Arkadaşına göndermen için
         val VALID_ACCESS_KEYS: Set<String> = setOf(
-            "KULUCKA-TEST-1104",
-            "KULUCKA-ARKADAS-7391"
+            "KULUCKA-9104-A",
+            "KULUCKA-3827-B",
+            "KULUCKA-6519-C",
+            "KULUCKA-2048-D",
+            "KULUCKA-7731-E",
+            "KULUCKA-5492-F",
+            "KULUCKA-8160-G",
+            "KULUCKA-4295-H",
+            "KULUCKA-1983-J",
+            "KULUCKA-6640-K"
         )
         const val TRIAL_DURATION_MILLIS: Long = 5L * 60L * 1000L // 5 dakika
 
