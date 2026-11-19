@@ -10,15 +10,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.EggAlt
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Style
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,12 +33,9 @@ import com.fikirkulucka.app.data.IdeaCatalogEngine
 import com.fikirkulucka.app.data.IdeaEntity
 import com.fikirkulucka.app.data.SuggestedIdea
 import com.fikirkulucka.app.ui.components.IncubationCard
+import com.fikirkulucka.app.ui.components.IncubationDashboardCanvas
 import com.fikirkulucka.app.ui.components.SwipeReviewCard
-import com.fikirkulucka.app.ui.theme.FikirKuluckaTheme
-import com.fikirkulucka.app.ui.theme.NeonCyan
-import com.fikirkulucka.app.ui.theme.RoseDiscard
-import com.fikirkulucka.app.ui.theme.VoidBlack
-import com.fikirkulucka.app.ui.theme.WarmAmber
+import com.fikirkulucka.app.ui.theme.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,6 +47,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+private val durationOptions = listOf("10DK", "1SA", "1G", "3G", "7G", "14G")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,8 +64,12 @@ fun FikirKuluckaApp(vm: IdeaViewModel = viewModel()) {
     var showAddSheet by remember { mutableStateOf(false) }
     var inspectedSuggestion by remember { mutableStateOf<SuggestedIdea?>(null) }
     var pendingApprovalIdea by remember { mutableStateOf<IdeaEntity?>(null) }
-    var activeRoadmapIdea by remember { mutableStateOf<IdeaEntity?>(null) }
+    var activeRoadmapIdeaId by remember { mutableStateOf<Long?>(null) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
+
+    val activeRoadmapIdea = remember(activeRoadmapIdeaId, approvedIdeas) {
+        approvedIdeas.find { it.id == activeRoadmapIdeaId }
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(snackbarMessage) {
@@ -80,62 +79,82 @@ fun FikirKuluckaApp(vm: IdeaViewModel = viewModel()) {
     }
 
     Scaffold(
-        containerColor = VoidBlack,
+        containerColor = PearlBackground,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            "Fikir Kuluçka Kutusu",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp
-                        )
-                        Text(
-                            "Öneri: ${vm.totalCatalogCount} • Kuluçka: ${activeIdeas.size} • Aktif Proje: ${approvedIdeas.size}",
-                            color = NeonCyan,
-                            fontSize = 12.sp
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Brush.linearGradient(listOf(VibrantCobalt, EmeraldMint))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Rounded.Lightbulb,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                "Fikir Kuluçka Kutusu",
+                                color = InkDark,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 18.sp
+                            )
+                            Text(
+                                "${vm.totalCatalogCount} Fikir • ${activeIdeas.size} Kuluçka • ${approvedIdeas.size} Rehber",
+                                color = SlateMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = VoidBlack)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = PearlBackground)
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = { showAddSheet = true },
-                containerColor = NeonCyan,
-                contentColor = VoidBlack
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = "Yeni Fikir Ekle")
-            }
+                containerColor = VibrantCobalt,
+                contentColor = Color.White,
+                icon = { Icon(Icons.Rounded.AddCircleOutline, contentDescription = null) },
+                text = { Text("Fikir Ekle", fontWeight = FontWeight.Bold) }
+            )
         },
         bottomBar = {
-            NavigationBar(containerColor = Color(0xFF0C1220)) {
+            NavigationBar(containerColor = PureCard) {
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
-                    label = { Text("10.5B Öneri") }
+                    icon = { Icon(Icons.Rounded.Explore, contentDescription = null) },
+                    label = { Text("Öneriler", fontSize = 11.sp) }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Rounded.EggAlt, contentDescription = null) },
-                    label = { Text("Kuluçka") }
+                    icon = { Icon(Icons.Rounded.Timeline, contentDescription = null) },
+                    label = { Text("Kuluçka", fontSize = 11.sp) }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.Rounded.Style, contentDescription = null) },
-                    label = { Text("Karar") }
+                    icon = { Icon(Icons.Rounded.Swipe, contentDescription = null) },
+                    label = { Text("Karar", fontSize = 11.sp) }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
-                    icon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null) },
-                    label = { Text("Yol Haritası") }
+                    icon = { Icon(Icons.Rounded.RocketLaunch, contentDescription = null) },
+                    label = { Text("Rehber", fontSize = 11.sp) }
                 )
             }
         }
@@ -143,11 +162,7 @@ fun FikirKuluckaApp(vm: IdeaViewModel = viewModel()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(VoidBlack, Color(0xFF0B1221), VoidBlack)
-                    )
-                )
+                .background(Brush.verticalGradient(listOf(PearlBackground, SoftTintCard.copy(alpha = 0.45f), PearlBackground)))
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp)
         ) {
@@ -160,56 +175,65 @@ fun FikirKuluckaApp(vm: IdeaViewModel = viewModel()) {
                     onSearchChanged = vm::updateSearchQuery,
                     onInspect = { inspectedSuggestion = it },
                     onQuickIncubate = { item ->
-                        vm.incubateSuggestion(item, 3)
+                        vm.incubateSuggestion(item, "3G")
                         snackbarMessage = "Kuluçkaya alındı: ${item.title}"
                     }
                 )
-                1 -> IncubatingListTab(ideas = activeIdeas)
+                1 -> IncubatingListTab(
+                    ideas = activeIdeas,
+                    approvedCount = approvedIdeas.size,
+                    onDecideNow = { pendingApprovalIdea = it }
+                )
                 2 -> ReviewSwipeTab(
                     ideas = activeIdeas,
-                    onRequestApprove = { idea -> pendingApprovalIdea = idea },
-                    onDiscard = { idea ->
-                        vm.archiveIdea(idea)
+                    onRequestApprove = { pendingApprovalIdea = it },
+                    onDiscard = {
+                        vm.archiveIdea(it)
                         snackbarMessage = "Fikir elendi."
+                    },
+                    onExtendIncubation = {
+                        vm.extendIncubation(it, 3)
+                        snackbarMessage = "Kuluçka süresi +3 gün uzatıldı."
                     }
                 )
                 3 -> ResultsTab(
                     approved = approvedIdeas,
                     archived = archivedIdeas,
-                    onOpenRoadmap = { activeRoadmapIdea = it },
+                    onOpenRoadmap = { activeRoadmapIdeaId = it.id },
                     onChangeState = { idea, state ->
                         vm.updateExecutionState(idea, state)
-                        snackbarMessage = "Durum güncellendi: ${state.label}"
+                        snackbarMessage = "Durum: ${state.label}"
                     },
                     onDelete = vm::deleteIdea
                 )
             }
         }
 
-        // Onaylarken "Başladım / Devam Ediyoruz / İptal Ettim" seçim penceresi + detay önizleme
         pendingApprovalIdea?.let { idea ->
             ApprovalDecisionDialog(
                 idea = idea,
                 onDismiss = { pendingApprovalIdea = null },
                 onConfirmState = { chosenState ->
-                    val updated = idea.copy(executionState = chosenState)
                     vm.approveIdeaWithState(idea, chosenState)
                     pendingApprovalIdea = null
                     selectedTab = 3
-                    activeRoadmapIdea = updated
+                    snackbarMessage = "${chosenState.label} seçildi — Detaylı rehber açılıyor"
                 }
             )
         }
 
-        // Onaylanan fikrin Aşırı Detaylı Uygulama Rehberi
         activeRoadmapIdea?.let { roadmapIdea ->
             FullExecutionRoadmapSheet(
                 idea = roadmapIdea,
-                onDismiss = { activeRoadmapIdea = null },
+                onDismiss = { activeRoadmapIdeaId = null },
                 onStateChange = { newState ->
                     vm.updateExecutionState(roadmapIdea, newState)
-                    activeRoadmapIdea = roadmapIdea.copy(executionState = newState)
                     snackbarMessage = "Durum: ${newState.label}"
+                },
+                onToggleStep = { idx -> vm.toggleStepCompleted(roadmapIdea, idx) },
+                onSaveNotes = { notes ->
+                    vm.updateUserNotes(roadmapIdea, notes)
+                    snackbarMessage = "Notların kaydedildi."
                 }
             )
         }
@@ -218,9 +242,9 @@ fun FikirKuluckaApp(vm: IdeaViewModel = viewModel()) {
             SuggestionDetailSheet(
                 suggestion = detail,
                 onDismiss = { inspectedSuggestion = null },
-                onIncubate = { days ->
-                    vm.incubateSuggestion(detail, days)
-                    snackbarMessage = "$days gün kuluçkaya yatırıldı"
+                onIncubate = { code ->
+                    vm.incubateSuggestion(detail, code)
+                    snackbarMessage = "$code süreyle kuluçkaya yatırıldı"
                     inspectedSuggestion = null
                 }
             )
@@ -229,8 +253,8 @@ fun FikirKuluckaApp(vm: IdeaViewModel = viewModel()) {
         if (showAddSheet) {
             QuickIdeaSheet(
                 onDismiss = { showAddSheet = false },
-                onSave = { text, days ->
-                    vm.addIdea(text, days)
+                onSave = { text, code ->
+                    vm.addIdea(text, code)
                     snackbarMessage = "Kendi fikrin kuluçkaya yatırıldı"
                     showAddSheet = false
                 }
@@ -247,12 +271,12 @@ private fun ApprovalDecisionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF131B2E),
+        containerColor = PureCard,
         title = {
             Text(
                 "Onaylıyor musun? Durumunu Seç",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
+                color = InkDark,
+                fontWeight = FontWeight.ExtraBold,
                 fontSize = 18.sp
             )
         },
@@ -260,42 +284,42 @@ private fun ApprovalDecisionDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     idea.content,
-                    color = NeonCyan,
+                    color = VibrantCobalt,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Seçim yaptığın anda bu fikir için 'Nereden Başlanmalı, Nasıl Yapılır, Nasıl Devam Etmeli ve Somut Örnek' içeren tam uygulama rehberi açılacak:",
-                    color = Color.White.copy(alpha = 0.8f),
+                    "Nereden başlanmalı, adım adım nasıl yapılır, nasıl devam etmeli, somut örnek ve olası tuzakların bulunduğu tam rehbere geç:",
+                    color = SlateMuted,
                     fontSize = 13.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Button(
                     onClick = { onConfirmState(ExecutionState.STARTED) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = VoidBlack)
+                    colors = ButtonDefaults.buttonColors(containerColor = VibrantCobalt, contentColor = Color.White)
                 ) {
-                    Text("🚀 Başladım (Hemen Uygula & Rehberi Aç)", fontWeight = FontWeight.Bold)
+                    Text("🚀 Başladım", fontWeight = FontWeight.Bold)
                 }
                 Button(
                     onClick = { onConfirmState(ExecutionState.IN_PROGRESS) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = WarmAmber, contentColor = VoidBlack)
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldMint, contentColor = Color.White)
                 ) {
-                    Text("⚡ Devam Ediyoruz (Süreci Sürdür & Rehberi Aç)", fontWeight = FontWeight.Bold)
+                    Text("⚡ Devam Ediyoruz", fontWeight = FontWeight.Bold)
                 }
                 OutlinedButton(
                     onClick = { onConfirmState(ExecutionState.CANCELLED) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("✖️ İptal Ettim (Kaydet ve Notlara Al)", color = RoseDiscard)
+                    Text("✖️ İptal Ettim", color = CoralRose, fontWeight = FontWeight.Bold)
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Geri Dön", color = Color.White.copy(alpha = 0.7f))
+                Text("Geri Dön", color = SlateMuted)
             }
         }
     )
@@ -306,111 +330,202 @@ private fun ApprovalDecisionDialog(
 private fun FullExecutionRoadmapSheet(
     idea: IdeaEntity,
     onDismiss: () -> Unit,
-    onStateChange: (ExecutionState) -> Unit
+    onStateChange: (ExecutionState) -> Unit,
+    onToggleStep: (Int) -> Unit,
+    onSaveNotes: (String) -> Unit
 ) {
     val plan = remember(idea.id, idea.content, idea.detailText, idea.stepsSerialized) {
         ActionGuideEngine.buildPlan(idea)
     }
+    val completedSet = remember(idea.completedStepIndices) { idea.getCompletedSet() }
+    var noteDraft by remember(idea.id, idea.userNotes) { mutableStateOf(idea.userNotes) }
+
+    val totalSteps = plan.stepByStepExecution.size.coerceAtLeast(1)
+    val doneSteps = completedSet.size.coerceAtMost(totalSteps)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF0E1525)
+        containerColor = PearlBackground
     ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 18.dp),
             contentPadding = PaddingValues(bottom = 36.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text(
-                    "TAM UYGULAMA & YOL HARİTASI REHBERİ",
-                    color = NeonCyan,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    plan.title,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Mevcut Durumun:", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 6.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(PureCard)
+                        .border(1.dp, BorderSoft, RoundedCornerShape(20.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(
-                        ExecutionState.STARTED to "🚀 Başladım",
-                        ExecutionState.IN_PROGRESS to "⚡ Devam Ediyoruz",
-                        ExecutionState.CANCELLED to "✖️ İptal Ettim"
-                    ).forEach { (st, label) ->
-                        FilterChip(
-                            selected = idea.executionState == st,
-                            onClick = { onStateChange(st) },
-                            label = { Text(label, fontSize = 11.sp) }
-                        )
+                    Text(
+                        "DETAYLI UYGULAMA REHBERİ • $doneSteps/$totalSteps ADIM TAMAM",
+                        color = VibrantCobalt,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        plan.title,
+                        color = InkDark,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 19.sp
+                    )
+                    LinearProgressIndicator(
+                        progress = { doneSteps.toFloat() / totalSteps.toFloat() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(50)),
+                        color = EmeraldMint,
+                        trackColor = BorderSoft
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            ExecutionState.STARTED to "🚀 Başladım",
+                            ExecutionState.IN_PROGRESS to "⚡ Devam Ediyoruz",
+                            ExecutionState.CANCELLED to "✖️ İptal Ettim"
+                        ).forEach { (st, lbl) ->
+                            FilterChip(
+                                selected = idea.executionState == st,
+                                onClick = { onStateChange(st) },
+                                label = { Text(lbl, fontSize = 11.sp) }
+                            )
+                        }
                     }
                 }
             }
 
             item {
-                RoadmapSectionCard(
-                    heading = "1. Detaylı Açıklama ve Nasıl Çalışacağı",
-                    accent = NeonCyan,
+                LightGuideSection(
+                    heading = "1. Fikir Nasıl Çalışır & Detaylı Açıklama",
+                    accent = VibrantCobalt,
                     lines = listOf(plan.howItWorks)
                 )
             }
 
             item {
-                RoadmapSectionCard(
+                LightGuideSection(
                     heading = "2. Nereden Başlanmalı? (İlk 15 Dakika)",
-                    accent = WarmAmber,
+                    accent = SunnyAmber,
                     lines = plan.whereToStart
                 )
             }
 
             item {
-                RoadmapSectionCard(
-                    heading = "3. Adım Adım Nasıl Yapılır?",
-                    accent = NeonCyan,
-                    lines = plan.stepByStepExecution
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(PureCard)
+                        .border(1.dp, BorderSoft, RoundedCornerShape(20.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "3. Adım Adım Nasıl Yapılır? (Tiklenebilir Liste)",
+                        color = EmeraldMint,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                    plan.stepByStepExecution.forEachIndexed { idx, stepText ->
+                        val checked = completedSet.contains(idx)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (checked) Color(0xFFECFDF5) else PearlBackground)
+                                .clickable { onToggleStep(idx) }
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (checked) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                                contentDescription = null,
+                                tint = if (checked) EmeraldMint else SlateMuted
+                            )
+                            Text(
+                                text = stepText,
+                                color = if (checked) SlateMuted else InkDark,
+                                textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None,
+                                fontSize = 13.sp,
+                                lineHeight = 19.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
             }
 
             item {
-                RoadmapSectionCard(
-                    heading = "4. Nasıl Devam Etmeli? (Sürdürme Planı)",
-                    accent = WarmAmber,
+                LightGuideSection(
+                    heading = "4. Nasıl Devam Etmeli? (Sürdürme Stratejisi)",
+                    accent = VibrantCobalt,
                     lines = plan.howToContinue
                 )
             }
 
             item {
-                RoadmapSectionCard(
+                LightGuideSection(
                     heading = "5. Somut Uygulama Örneği",
-                    accent = NeonCyan,
+                    accent = EmeraldMint,
                     lines = listOf(plan.concreteExample)
                 )
             }
 
             item {
-                RoadmapSectionCard(
-                    heading = "6. Olası Tuzaklar ve Çözümleri",
-                    accent = RoseDiscard,
+                LightGuideSection(
+                    heading = "6. Dikkat Edilmesi Gereken Tuzaklar",
+                    accent = CoralRose,
                     lines = plan.pitfallsAndSolutions
                 )
+            }
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(PureCard)
+                        .border(1.dp, BorderSoft, RoundedCornerShape(20.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "7. Bu Fikre Özel Notların",
+                        color = InkDark,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                    OutlinedTextField(
+                        value = noteDraft,
+                        onValueChange = { noteDraft = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Malzeme, ölçüm, link veya aklına gelen notu yaz...") },
+                        minLines = 2
+                    )
+                    Button(
+                        onClick = { onSaveNotes(noteDraft) },
+                        colors = ButtonDefaults.buttonColors(containerColor = VibrantCobalt, contentColor = Color.White)
+                    ) {
+                        Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Notu Kaydet", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RoadmapSectionCard(
+private fun LightGuideSection(
     heading: String,
     accent: Color,
     lines: List<String>
@@ -418,24 +533,24 @@ private fun RoadmapSectionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF151F34))
-            .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(PureCard)
+            .border(1.dp, accent.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
             text = heading,
             color = accent,
             fontWeight = FontWeight.Bold,
-            fontSize = 15.sp
+            fontSize = 14.sp
         )
         lines.forEach { line ->
             Text(
                 text = "• $line",
-                color = Color.White.copy(alpha = 0.92f),
+                color = InkDark.copy(alpha = 0.9f),
                 fontSize = 13.sp,
-                lineHeight = 20.sp
+                lineHeight = 19.sp
             )
         }
     }
@@ -459,13 +574,13 @@ private fun ExploreSuggestionsTab(
                 .fillMaxWidth()
                 .padding(top = 6.dp),
             singleLine = true,
-            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = NeonCyan) },
+            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = VibrantCobalt) },
             placeholder = { Text("Yemek, yazılım, alışkanlık veya anahtar kelime ara...") },
             shape = RoundedCornerShape(16.dp)
         )
 
         LazyRow(
-            contentPadding = PaddingValues(vertical = 10.dp),
+            contentPadding = PaddingValues(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(IdeaCatalogEngine.categories, key = { it }) { cat ->
@@ -478,10 +593,10 @@ private fun ExploreSuggestionsTab(
         }
 
         Text(
-            text = "${suggestions.size} fikir listeleniyor • Detay ve yapılış için karta dokun",
-            color = Color.White.copy(alpha = 0.65f),
+            text = "${suggestions.size} fikir • Detay ve yapılış için karta dokun",
+            color = SlateMuted,
             fontSize = 12.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.padding(bottom = 6.dp)
         )
 
         LazyColumn(
@@ -509,32 +624,31 @@ private fun SuggestionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF121A2C))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+            .background(PureCard)
+            .border(1.dp, BorderSoft, RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "${item.category}  •  ${item.duration}  •  ${item.difficulty}",
-                color = NeonCyan,
+                text = "${item.category} • ${item.duration} • ${item.difficulty}",
+                color = VibrantCobalt,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.Bold
             )
             Text(
                 text = "#${item.id}",
-                color = Color.White.copy(alpha = 0.4f),
+                color = SlateMuted,
                 fontSize = 11.sp
             )
         }
         Text(
             text = item.title,
-            color = Color.White,
+            color = InkDark,
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             maxLines = 2,
@@ -542,7 +656,7 @@ private fun SuggestionCard(
         )
         Text(
             text = item.description,
-            color = Color.White.copy(alpha = 0.78f),
+            color = SlateMuted,
             fontSize = 13.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -552,7 +666,9 @@ private fun SuggestionCard(
             horizontalArrangement = Arrangement.End
         ) {
             TextButton(onClick = onIncubate) {
-                Text("Kuluçkaya Al (3G)", color = WarmAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Icon(Icons.Rounded.Spa, contentDescription = null, tint = EmeraldMint, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Kuluçkaya Al (3G)", color = EmeraldMint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
     }
@@ -563,75 +679,76 @@ private fun SuggestionCard(
 private fun SuggestionDetailSheet(
     suggestion: SuggestedIdea,
     onDismiss: () -> Unit,
-    onIncubate: (Int) -> Unit
+    onIncubate: (String) -> Unit
 ) {
-    var days by remember { mutableIntStateOf(3) }
+    var selectedCode by remember { mutableStateOf("3G") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF111827)
+        containerColor = PearlBackground
     ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 18.dp),
             contentPadding = PaddingValues(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
                 Text(
                     "${suggestion.category} • ${suggestion.duration} • ${suggestion.difficulty}",
-                    color = NeonCyan,
+                    color = VibrantCobalt,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     suggestion.title,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
+                    color = InkDark,
+                    fontWeight = FontWeight.ExtraBold,
                     fontSize = 19.sp
                 )
             }
             item {
-                Text("Açıklama ve Detay", color = WarmAmber, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(
-                    suggestion.description,
-                    color = Color.White.copy(alpha = 0.88f),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
+                LightGuideSection(
+                    heading = "Açıklama ve Detay",
+                    accent = VibrantCobalt,
+                    lines = listOf(suggestion.description)
                 )
             }
             item {
-                Text("Nasıl Yapılır? (Adımlar)", color = WarmAmber, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-            items(suggestion.howToDoIt.mapIndexed { idx, step -> (idx + 1) to step }) { (num, step) ->
-                Text(
-                    "$num. $step",
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp
+                LightGuideSection(
+                    heading = "Nasıl Yapılır? (Adımlar)",
+                    accent = EmeraldMint,
+                    lines = suggestion.howToDoIt.mapIndexed { i, s -> "${i + 1}. $s" }
                 )
             }
             item {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text("Kuluçka Süresi Seç ($days gün)", color = NeonCyan, fontSize = 13.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    listOf(1, 3, 7, 14).forEach { preset ->
-                        FilterChip(
-                            selected = days == preset,
-                            onClick = { days = preset },
-                            label = { Text("${preset}G") }
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { onIncubate(days) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = VoidBlack)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(PureCard)
+                        .border(1.dp, BorderSoft, RoundedCornerShape(18.dp))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Kuluçka Kutusuna Ekle", fontWeight = FontWeight.Bold)
+                    Text("Kuluçka Süresi Seç ($selectedCode)", color = InkDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(durationOptions) { code ->
+                            FilterChip(
+                                selected = selectedCode == code,
+                                onClick = { selectedCode = code },
+                                label = { Text(code, fontSize = 12.sp) }
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = { onIncubate(selectedCode) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = VibrantCobalt, contentColor = Color.White)
+                    ) {
+                        Text("Kuluçka Kutusuna Ekle", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -639,22 +756,43 @@ private fun SuggestionDetailSheet(
 }
 
 @Composable
-private fun IncubatingListTab(ideas: List<IdeaEntity>) {
-    if (ideas.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "Henüz kuluçkada fikir yok.\n10.5B Öneri sekmesinden seç veya + ile kendi fikrini ekle.",
-                color = Color.White.copy(alpha = 0.65f)
-            )
-        }
-        return
-    }
+private fun IncubatingListTab(
+    ideas: List<IdeaEntity>,
+    approvedCount: Int,
+    onDecideNow: (IdeaEntity) -> Unit
+) {
     LazyColumn(
         contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(ideas, key = { it.id }) { idea ->
-            IncubationCard(idea = idea)
+        item {
+            IncubationDashboardCanvas(
+                activeIdeas = ideas,
+                approvedCount = approvedCount
+            )
+        }
+        if (ideas.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 36.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Henüz kuluçkada fikir yok.\nÖneriler sekmesinden seç veya Fikir Ekle ile yeni fikir bırak.",
+                        color = SlateMuted,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            items(ideas, key = { it.id }) { idea ->
+                IncubationCard(
+                    idea = idea,
+                    onDecideNow = onDecideNow
+                )
+            }
         }
     }
 }
@@ -663,34 +801,39 @@ private fun IncubatingListTab(ideas: List<IdeaEntity>) {
 private fun ReviewSwipeTab(
     ideas: List<IdeaEntity>,
     onRequestApprove: (IdeaEntity) -> Unit,
-    onDiscard: (IdeaEntity) -> Unit
+    onDiscard: (IdeaEntity) -> Unit,
+    onExtendIncubation: (IdeaEntity) -> Unit
 ) {
     val currentIdea = ideas.firstOrNull()
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         if (currentIdea == null) {
             Text(
                 "İncelenecek fikir kalmadı.",
-                color = Color.White.copy(alpha = 0.65f)
+                color = SlateMuted
             )
         } else {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 SwipeReviewCard(
                     idea = currentIdea,
                     onApprove = onRequestApprove,
-                    onDiscard = onDiscard
+                    onDiscard = onDiscard,
+                    onExtendIncubation = onExtendIncubation
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(onClick = { onDiscard(currentIdea) }) {
-                        Text("Vazgeç", color = RoseDiscard)
+                        Text("Vazgeç", color = CoralRose, fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(onClick = { onExtendIncubation(currentIdea) }) {
+                        Text("+3G Uzat", color = SunnyAmber, fontWeight = FontWeight.Bold)
                     }
                     Button(
                         onClick = { onRequestApprove(currentIdea) },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = VoidBlack)
+                        colors = ButtonDefaults.buttonColors(containerColor = VibrantCobalt, contentColor = Color.White)
                     ) {
-                        Text("Onayla & Detaylı Rehberi Aç", fontWeight = FontWeight.Bold)
+                        Text("Onayla", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -712,9 +855,9 @@ private fun ResultsTab(
     ) {
         item {
             Text(
-                "Onaylanan Projeler & Yol Haritaları (${approved.size})",
-                color = WarmAmber,
-                fontWeight = FontWeight.Bold,
+                "Onaylanan Projeler & Detaylı Rehberler (${approved.size})",
+                color = InkDark,
+                fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.padding(vertical = 4.dp)
             )
         }
@@ -727,10 +870,10 @@ private fun ResultsTab(
             )
         }
         item {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 "Elenenler (${archived.size})",
-                color = Color.White.copy(alpha = 0.6f),
+                color = SlateMuted,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 4.dp)
             )
@@ -738,7 +881,7 @@ private fun ResultsTab(
         items(archived, key = { "arc_${it.id}" }) { item ->
             Surface(
                 shape = RoundedCornerShape(18.dp),
-                color = Color(0xFF131B2E),
+                color = PureCard,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -748,12 +891,12 @@ private fun ResultsTab(
                     Box(
                         modifier = Modifier
                             .size(10.dp)
-                            .background(RoseDiscard, RoundedCornerShape(50))
+                            .background(CoralRose, RoundedCornerShape(50))
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = item.content, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.weight(1f))
+                    Text(text = item.content, color = SlateMuted, modifier = Modifier.weight(1f))
                     IconButton(onClick = { onDelete(item) }) {
-                        Icon(Icons.Rounded.DeleteOutline, contentDescription = "Sil", tint = Color.White.copy(alpha = 0.6f))
+                        Icon(Icons.Rounded.DeleteOutline, contentDescription = "Sil", tint = SlateMuted)
                     }
                 }
             }
@@ -769,44 +912,46 @@ private fun ApprovedRoadmapRow(
     onDelete: () -> Unit
 ) {
     val stateColor = when (idea.executionState) {
-        ExecutionState.STARTED -> NeonCyan
-        ExecutionState.IN_PROGRESS -> WarmAmber
-        ExecutionState.CANCELLED -> RoseDiscard
-        ExecutionState.PENDING -> Color.White
+        ExecutionState.STARTED -> VibrantCobalt
+        ExecutionState.IN_PROGRESS -> EmeraldMint
+        ExecutionState.CANCELLED -> CoralRose
+        ExecutionState.PENDING -> SunnyAmber
     }
+    val stepCount = idea.getCompletedSet().size
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF131B2E))
-            .border(1.dp, stateColor.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+            .background(PureCard)
+            .border(1.2.dp, stateColor.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
             .clickable(onClick = onOpenRoadmap)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "DURUM: ${idea.executionState.label.uppercase()}",
+                text = "${idea.executionState.label.uppercase()} • $stepCount ADIM TIKLI",
                 color = stateColor,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Rounded.DeleteOutline, contentDescription = "Sil", tint = Color.White.copy(alpha = 0.6f))
+                Icon(Icons.Rounded.DeleteOutline, contentDescription = "Sil", tint = SlateMuted)
             }
         }
         Text(
             text = idea.content,
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold,
+            color = InkDark,
+            fontWeight = FontWeight.Bold,
             fontSize = 15.sp
         )
         Text(
-            text = "📖 Detaylı nasıl yapılır, nereden başlanır ve somut örnek rehberi için dokun",
-            color = NeonCyan.copy(alpha = 0.9f),
-            fontSize = 12.sp
+            text = "📖 Nereden başlanır, nasıl yapılır, somut örnek ve notlar için dokun",
+            color = VibrantCobalt,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
@@ -828,22 +973,22 @@ private fun ApprovedRoadmapRow(
 @Composable
 private fun QuickIdeaSheet(
     onDismiss: () -> Unit,
-    onSave: (String, Int) -> Unit
+    onSave: (String, String) -> Unit
 ) {
     var text by remember { mutableStateOf("") }
-    var days by remember { mutableIntStateOf(3) }
+    var code by remember { mutableStateOf("10DK") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF111827)
+        containerColor = PureCard
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Yeni Fikir Ekle", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Yeni Fikir Ekle", color = InkDark, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
@@ -852,20 +997,20 @@ private fun QuickIdeaSheet(
                 singleLine = false,
                 minLines = 2
             )
-            Text("Kuluçka süresi: $days gün", color = NeonCyan, fontSize = 13.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf(1, 3, 7, 14).forEach { preset ->
+            Text("Kuluçka süresi seç ($code):", color = VibrantCobalt, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(durationOptions) { opt ->
                     FilterChip(
-                        selected = days == preset,
-                        onClick = { days = preset },
-                        label = { Text("${preset}G") }
+                        selected = code == opt,
+                        onClick = { code = opt },
+                        label = { Text(opt, fontSize = 12.sp) }
                     )
                 }
             }
             Button(
-                onClick = { onSave(text, days) },
+                onClick = { onSave(text, code) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = VoidBlack)
+                colors = ButtonDefaults.buttonColors(containerColor = VibrantCobalt, contentColor = Color.White)
             ) {
                 Text("Kuluçkaya Yatır", fontWeight = FontWeight.Bold)
             }

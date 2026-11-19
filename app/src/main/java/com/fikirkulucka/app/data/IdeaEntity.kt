@@ -27,11 +27,18 @@ data class IdeaEntity(
     val executionState: ExecutionState = ExecutionState.PENDING,
     val category: String = "Kişisel Fikir",
     val detailText: String = "",
-    val stepsSerialized: String = ""
+    val stepsSerialized: String = "",
+    val completedStepIndices: String = "",
+    val userNotes: String = ""
 ) {
     fun getProgress(now: Long = System.currentTimeMillis()): Float {
         val total = (matureAt - createdAt).coerceAtLeast(1L)
         val elapsed = (now - createdAt).coerceIn(0L, total)
         return (elapsed.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+    }
+
+    fun getCompletedSet(): Set<Int> {
+        if (completedStepIndices.isBlank()) return emptySet()
+        return completedStepIndices.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
     }
 }

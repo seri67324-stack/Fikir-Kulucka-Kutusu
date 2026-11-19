@@ -10,15 +10,18 @@ import com.fikirkulucka.app.data.IdeaEntity
 import com.fikirkulucka.app.data.IdeaStatus
 import com.fikirkulucka.app.data.SuggestedIdea
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
+@OptIn(FlowPreview::class)
 class IdeaViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getInstance(application).ideaDao()
 
@@ -31,7 +34,10 @@ class IdeaViewModel(application: Application) : AndroidViewModel(application) {
     val totalCatalogCount: Int = IdeaCatalogEngine.getTotalCount()
 
     val filteredSuggestions: StateFlow<List<SuggestedIdea>> =
-        combine(_selectedCategory, _searchQuery) { category, query ->
+        combine(
+            _selectedCategory,
+            _searchQuery.debounce(180L)
+        ) { category, query ->
             IdeaCatalogEngine.queryIdeas(category, query)
         }
             .flowOn(Dispatchers.Default)
@@ -54,11 +60,21 @@ class IdeaViewModel(application: Application) : AndroidViewModel(application) {
         _searchQuery.value = query
     }
 
-    fun addIdea(rawText: String, incubationDays: Int) {
+    private fun durationMillisFromCode(code: String): Long = when (code) {
+        "10DK" -> TimeUnit.MINUTES.toMillis(10L)
+        "1SA" -> TimeUnit.HOURS.toMillis(1L)
+        "1G" -> TimeUnit.DAYS.toMillis(1L)
+        "3G" -> TimeUnit.DAYS.toMillis(3L)
+        "7G" -> TimeUnit.DAYS.toMillis(7L)
+        "14G" -> TimeUnit.DAYS.toMillis(14L)
+        else -> TimeUnit.DAYS.toMillis(3L)
+    }
+
+    fun addIdea(rawText: String, durationCode: String) {
         val trimmed = rawText.trim()
         if (trimmed.isEmpty()) return
         val now = System.currentTimeMillis()
-        val matureAt = now + TimeUnit.DAYS.toMillis(incubationDays.toLong())
+        val matureAt = now + durationMillisFromCode(durationCode)
         viewModelScope.launch {
             dao.insert(
                 IdeaEntity(
@@ -72,13 +88,13 @@ class IdeaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun incubateSuggestion(suggestion: SuggestedIdea, incubationDays: Int = 3) {
+    fun incubateSuggestion(suggestion: SuggestedIdea, durationCode: String = "3G") {
         val now = System.currentTimeMillis()
-        val matureAt = now + TimeUnit.DAYS.toMillis(incubationDays.toLong())
+        val matureAt = now + durationMillisFromCode(durationCode)
         viewModelScope.launch {
             dao.insert(
                 IdeaEntity(
-                    content = "[${suggestion.category}] ${suggestion.title}",
+                    content = "[${suggestion.category}]${suggestion.title}",
                     createdAt = now,
                     matureAt = matureAt,
                     status = IdeaStatus.INCUBATING,
@@ -86,6 +102,18 @@ class IdeaViewModel(application: Application) : AndroidViewModel(application) {
                     category = suggestion.category,
                     detailText = suggestion.description,
                     stepsSerialized = suggestion.howToDoIt.joinToString("||")
+                )
+            )
+        }
+    }
+
+    fun extendIncubation(idea: IdeaEntity, extraDays: Int = 3) {
+        viewModelScope.launch {
+            val baseTime = maxOf(idea.matureAt, System.currentTimeMillis())
+            dao.update(
+                idea.copy(
+                    matureAt = baseTime + TimeUnit.DAYS.toMillis(extraDays.toLong()),
+                    status = IdeaStatus.INCUBATING
                 )
             )
         }
@@ -105,6 +133,23 @@ class IdeaViewModel(application: Application) : AndroidViewModel(application) {
     fun updateExecutionState(idea: IdeaEntity, state: ExecutionState) {
         viewModelScope.launch {
             dao.update(idea.copy(executionState = state))
+        }
+    }
+
+    fun toggleStepCompleted(idea: IdeaEntity, stepIndex: Int) {
+        val current = idea.getCompletedSet().toMutableSet()
+        if (!current.add(stepIndex)) {
+            current.remove(stepIndex)
+        }
+        val serialized = current.sorted().joinToString(",")
+        viewModelScope.launch {
+            dao.update(idea.copy(completedStepIndices = serialized))
+        }
+    }
+
+    fun updateUserNotes(idea: IdeaEntity, notes: String) {
+        viewModelScope.launch {
+            dao.update(idea.copy(userNotes = notes))
         }
     }
 
