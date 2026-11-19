@@ -5,7 +5,7 @@
         android:allowBackup="true"
         android:label="Fikir Kuluçka"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.Dark.NoActionBar">
+        android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
             android:name=".MainActivity"
             android:exported="true"
